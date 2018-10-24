@@ -14,14 +14,29 @@ namespace ClientUI
         {
             Console.Title = "ClientUI";
 
-            var endpointConfiguration = new EndpointConfiguration("ClientUI");
+            var config = new EndpointConfiguration("RetailDemo.ClientUI");
+            config.AssemblyScanner();
+            config.UsePersistence<InMemoryPersistence>();
+            config.LimitMessageProcessingConcurrencyTo(1);
+            config.SendFailedMessagesTo("RetailDemo.error");
+            config.AuditProcessedMessagesTo("RetailDemo.audit");
+            config.EnableInstallers();
 
-            var transport = endpointConfiguration.UseTransport<LearningTransport>();
+            var metrics = config.EnableMetrics();
+
+            metrics.SendMetricDataToServiceControl(
+                serviceControlMetricsAddress: "Particular.Monitoring",
+                interval: TimeSpan.FromSeconds(2)
+            );
+
+            var transport = config.UseTransport<RabbitMQTransport>();
+            transport.UseConventionalRoutingTopology();
+            transport.ConnectionString("host=localhost");
 
             var routing = transport.Routing();
-            routing.RouteToEndpoint(typeof(PlaceOrder), "Sales");
+            routing.RouteToEndpoint(typeof(PlaceOrder), "RetailDemo.Sales");
 
-            var endpointInstance = await Endpoint.Start(endpointConfiguration)
+            var endpointInstance = await Endpoint.Start(config)
                 .ConfigureAwait(false);
 
             await RunLoop(endpointInstance)

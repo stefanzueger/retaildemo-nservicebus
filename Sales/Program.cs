@@ -13,11 +13,26 @@ namespace Sales
         {
             Console.Title = "Sales";
 
-            var endpointConfiguration = new EndpointConfiguration("Sales");
+            var config = new EndpointConfiguration("RetailDemo.Sales");
+            config.AssemblyScanner();
+            config.UsePersistence<InMemoryPersistence>();
+            config.LimitMessageProcessingConcurrencyTo(1);
+            config.SendFailedMessagesTo("RetailDemo.error");
+            config.AuditProcessedMessagesTo("RetailDemo.audit");
+            config.EnableInstallers();
 
-            var transport = endpointConfiguration.UseTransport<LearningTransport>();
+            var metrics = config.EnableMetrics();
 
-            var endpointInstance = await Endpoint.Start(endpointConfiguration)
+            metrics.SendMetricDataToServiceControl(
+                serviceControlMetricsAddress: "Particular.Monitoring",
+                interval: TimeSpan.FromSeconds(2)
+            );
+
+            var transport = config.UseTransport<RabbitMQTransport>();
+            transport.UseConventionalRoutingTopology();
+            transport.ConnectionString("host=localhost");
+
+            var endpointInstance = await Endpoint.Start(config)
                 .ConfigureAwait(false);
 
             Console.WriteLine("Press Enter to exit.");

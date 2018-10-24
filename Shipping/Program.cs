@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using NServiceBus;
+using Raven.Client.Document;
 
 namespace Shipping
 {
@@ -13,15 +14,42 @@ namespace Shipping
         {
             Console.Title = "Shipping";
 
-            var endpointConfiguration = new EndpointConfiguration("Shipping");
+            var config = new EndpointConfiguration("RetailDemo.Shipping");
+            config.AssemblyScanner();
+            config.LimitMessageProcessingConcurrencyTo(1);
+            config.SendFailedMessagesTo("RetailDemo.error");
+            config.AuditProcessedMessagesTo("RetailDemo.audit");
+            config.EnableInstallers();
 
-            var transport = endpointConfiguration.UseTransport<LearningTransport>();
+            var documentStore = new DocumentStore
+            {
+                Url = "http://localhost:8080",
+                DefaultDatabase = "RetailDemo.Shipping"
+            };
+            documentStore.Initialize(ensureDatabaseExists: true);
 
-            var endpointInstance = await Endpoint.Start(endpointConfiguration)
+            var persistence = config.UsePersistence<RavenDBPersistence>();
+            persistence.DisableSubscriptionVersioning();
+            persistence.SetDefaultDocumentStore(documentStore);
+
+            var metrics = config.EnableMetrics();
+
+            metrics.SendMetricDataToServiceControl(
+                serviceControlMetricsAddress: "Particular.Monitoring",
+                interval: TimeSpan.FromSeconds(2)
+            );
+
+            var transport = config.UseTransport<RabbitMQTransport>();
+            transport.UseConventionalRoutingTopology();
+            transport.ConnectionString("host=localhost");
+
+            var endpointInstance = await Endpoint.Start(config)
                 .ConfigureAwait(false);
 
             Console.WriteLine("Press Enter to exit.");
             Console.ReadLine();
+
+            documentStore.Dispose();
 
             await endpointInstance.Stop()
                 .ConfigureAwait(false);

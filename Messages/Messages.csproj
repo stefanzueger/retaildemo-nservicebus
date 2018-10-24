@@ -48,6 +48,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Commands\PlaceOrder.cs" />
+    <Compile Include="Commands\ShipOrder.cs" />
     <Compile Include="Events\OrderBilled.cs" />
     <Compile Include="Events\OrderPlaced.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
